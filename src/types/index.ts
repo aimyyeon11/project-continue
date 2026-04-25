@@ -13,6 +13,7 @@ export interface Txn {
   amount: number;
   time: string; // display
   ts: number;   // sort
+  createdAt?: string; // ISO date string
 }
 
 export interface BuyItem {

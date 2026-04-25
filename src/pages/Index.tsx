@@ -14,30 +14,10 @@ import { ExportSheet } from "@/features/money/ExportSheet";
 import { ChatView } from "@/features/ai/ChatView";
 import { mockBotReply } from "@/features/ai/mockBotReply";
 import { fmt } from "@/lib/format";
+import { useTxns, useStock, useBuyList, usePetty } from "@/hooks/useFirestore";
 import type {
   Tab, Txn, BuyItem, StockItem, ChatMsg, PettyEntry, ReceiptItem, Unit,
 } from "@/types";
-
-const initialTxns: Txn[] = [
-  { id: 1, type: "in", emoji: "💰", label: "Jualan Petang", amount: 420, time: "3:45pm", ts: 5 },
-  { id: 2, type: "in", emoji: "💰", label: "Jualan Pagi", amount: 380, time: "12:10pm", ts: 4 },
-  { id: 3, type: "in", emoji: "💰", label: "Penghantaran", amount: 440, time: "11:00am", ts: 3 },
-  { id: 4, type: "out", emoji: "🍗", label: "Beli Ayam", amount: 32, time: "9:20am", ts: 2 },
-  { id: 5, type: "out", emoji: "🛢️", label: "Minyak Masak", amount: 18, time: "8:05am", ts: 1 },
-];
-
-const initialStock: StockItem[] = [
-  { id: "1", emoji: "🍗", name: "Ayam", qty: 0.5, unit: "kg", minQty: 1, restockQty: 3, maxQty: 8, category: "Bahan Mentah" },
-  { id: "2", emoji: "🛢️", name: "Minyak Masak", qty: 0.3, unit: "liter", minQty: 0.5, restockQty: 2, maxQty: 5, category: "Bahan Mentah" },
-  { id: "3", emoji: "🌾", name: "Tepung", qty: 1.5, unit: "kg", minQty: 1, restockQty: 2, maxQty: 6, category: "Bahan Mentah" },
-  { id: "4", emoji: "📦", name: "Plastik Beg", qty: 20, unit: "pek", minQty: 10, restockQty: 30, maxQty: 80, category: "Pembungkusan" },
-  { id: "5", emoji: "🍚", name: "Beras", qty: 5, unit: "kg", minQty: 2, restockQty: 4, maxQty: 15, category: "Bahan Mentah" },
-  { id: "6", emoji: "🥚", name: "Telur", qty: 30, unit: "biji", minQty: 12, restockQty: 24, maxQty: 60, category: "Bahan Mentah" },
-  { id: "7", emoji: "🥛", name: "Santan", qty: 2, unit: "liter", minQty: 0.5, restockQty: 1, maxQty: 5, category: "Minuman" },
-  { id: "8", emoji: "🍬", name: "Gula", qty: 3.5, unit: "kg", minQty: 1, restockQty: 2, maxQty: 8, category: "Bahan Mentah" },
-];
-
-const initialBuy: BuyItem[] = [];
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -55,15 +35,12 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileName, setProfileName] = useState(() => localStorage.getItem("warkahbiz_profile_name") || "");
   const [businessName, setBusinessName] = useState(() => localStorage.getItem("warkahbiz_business_name") || "");
-  const [txns, setTxns] = useState<Txn[]>(initialTxns);
-  const [stock, setStock] = useState<StockItem[]>(initialStock);
-  const [buy, setBuy] = useState<BuyItem[]>(initialBuy);
+  const { txns, addTxn } = useTxns();
+  const { stock, saveStock, deleteStock, adjustStock } = useStock();
+  const { buy, saveBuyItem, deleteBuyItem, updateBuyItem } = useBuyList();
   const [dismissedAuto, setDismissedAuto] = useState<Set<string>>(new Set());
   const [chat, setChat] = useState<ChatMsg[]>([]);
-  const [petty, setPetty] = useState<PettyEntry[]>([
-    { id: 1, type: "in", desc: "Top-up dari jualan", emoji: "💵", amount: 200, time: "Isnin 9:00am", balance: 200 },
-    { id: 2, type: "out", desc: "Beli plastik beg", emoji: "🛍️", amount: 15, time: "Isnin 11:30am", balance: 185 },
-  ]);
+  const { petty, addPetty } = usePetty();
 
   useEffect(() => {
     setChat((prev) => {
@@ -78,76 +55,102 @@ const Index = () => {
     const outgoing = txns.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
     return { in: incoming, out: outgoing, profit: incoming - outgoing };
   }, [txns]);
-  const week = { in: today.in + 6600, out: today.out + 4610, profit: today.profit + 1990 };
-  const month = { in: today.in + 28400, out: today.out + 19800, profit: today.profit + 8600 };
+  const week = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recent = txns.filter((x) => x.ts >= cutoff);
+    const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
+    const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
+    return { in: i, out: o, profit: i - o };
+  }, [txns]);
+  const month = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const recent = txns.filter((x) => x.ts >= cutoff);
+    const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
+    const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
+    return { in: i, out: o, profit: i - o };
+  }, [txns]);
 
   const nowTime = () =>
     new Date().toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase().replace(" ", "");
 
   const handleSaveTxn = (t: Omit<Txn, "id" | "ts" | "time">) => {
-    setTxns((prev) => [{ ...t, id: Date.now(), ts: Date.now(), time: nowTime() }, ...prev]);
+    const newTxn: Txn = {
+      ...t,
+      id: Date.now(),
+      ts: Date.now(),
+      time: nowTime(),
+      createdAt: new Date().toISOString(),
+    };
+    addTxn(newTxn);
   };
 
   const handleReceiptConfirm = (items: ReceiptItem[]) => {
     const time = nowTime();
     items.forEach((r, i) => {
-      setTxns((prev) => [
-        { id: Date.now() + i, ts: Date.now() + i, time, type: "out", emoji: r.emoji, label: `Beli ${r.name}`, amount: r.price },
-        ...prev,
-      ]);
+      addTxn({
+        id: Date.now() + i,
+        ts: Date.now() + i,
+        time,
+        createdAt: new Date().toISOString(),
+        type: "out",
+        emoji: r.emoji,
+        label: `Beli ${r.name}`,
+        amount: r.price,
+      });
     });
     toast.success(`${items.length} item berjaya disimpan! 🎉`);
   };
 
   const handleBought = (id: string) => {
-    setBuy((prev) => prev.map((b) => (b.id === id ? { ...b, done: !b.done } : b)));
+    const item = buy.find((b) => b.id === id);
+    if (item) updateBuyItem(id, { done: !item.done });
   };
 
   const handleAdjustStock = (id: string, delta: number) => {
-    setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: Math.max(0, +(s.qty + delta).toFixed(2)) } : s)));
+    const item = stock.find((s) => s.id === id);
+    if (!item) return;
+    const newQty = Math.max(0, +(item.qty + delta).toFixed(2));
+    adjustStock(id, newQty);
   };
 
   const handleSaveStock = (item: StockItem) => {
-    setStock((prev) => {
-      const exists = prev.some((s) => s.id === item.id);
-      return exists ? prev.map((s) => (s.id === item.id ? item : s)) : [...prev, item];
-    });
+    saveStock(item);
     toast.success("Stok disimpan ✅");
   };
 
   const handleDeleteStock = (id: string) => {
-    setStock((prev) => prev.filter((s) => s.id !== id));
+    deleteStock(id);
     toast.success("Item dipadam");
   };
 
   // Auto-sync: low-stock items appear in Nak Beli unless dismissed
   useEffect(() => {
-    setBuy((prev) => {
-      const next = [...prev];
-      stock.forEach((s) => {
-        if (s.qty > s.restockQty) return;
-        const autoId = `auto-${s.id}`;
-        if (dismissedAuto.has(autoId)) return;
-        if (next.some((b) => b.id === autoId)) return;
-        if (next.some((b) => b.name.toLowerCase() === s.name.toLowerCase() && b.source !== "auto")) return;
-        const need = Math.max(s.restockQty - s.qty, s.restockQty);
-        next.push({
-          id: autoId, emoji: s.emoji, name: s.name, cost: 0,
-          currentQty: s.qty, recQty: +need.toFixed(1), unit: s.unit, daysCover: 0,
-          reason: s.qty <= s.minQty ? "Habis!" : "Hampir habis",
-          done: false, source: "auto",
-        });
-      });
-      return next.filter((b) => {
-        if (b.source !== "auto") return true;
-        const sId = b.id.replace(/^auto-/, "");
-        const s = stock.find((x) => x.id === sId);
-        if (!s) return true;
-        if (s.qty > s.restockQty && !b.done) return false;
-        return true;
+    // Add new auto-restock items
+    stock.forEach((s) => {
+      if (s.qty > s.restockQty) return;
+      const autoId = `auto-${s.id}`;
+      if (dismissedAuto.has(autoId)) return;
+      if (buy.some((b) => b.id === autoId)) return;
+      if (buy.some((b) => b.name.toLowerCase() === s.name.toLowerCase() && b.source !== "auto")) return;
+      const need = Math.max(s.restockQty - s.qty, s.restockQty);
+      saveBuyItem({
+        id: autoId, emoji: s.emoji, name: s.name, cost: 0,
+        currentQty: s.qty, recQty: +need.toFixed(1), unit: s.unit, daysCover: 0,
+        reason: s.qty <= s.minQty ? "Habis!" : "Hampir habis",
+        done: false, source: "auto",
       });
     });
-  }, [stock, dismissedAuto]);
+    // Remove stale auto items (stock now sufficient and not yet done)
+    buy.forEach((b) => {
+      if (b.source !== "auto") return;
+      const sId = b.id.replace(/^auto-/, "");
+      const s = stock.find((x) => x.id === sId);
+      if (!s) return;
+      if (s.qty > s.restockQty && !b.done) {
+        deleteBuyItem(b.id);
+      }
+    });
+  }, [stock, dismissedAuto, buy, saveBuyItem, deleteBuyItem]);
 
   const handleResync = () => {
     setDismissedAuto(new Set());
@@ -155,32 +158,29 @@ const Index = () => {
   };
 
   const handleAddBuy = (d: { emoji: string; name: string; recQty: number; unit: Unit; note?: string }) => {
-    setBuy((prev) => [...prev, {
+    const newItem: BuyItem = {
       id: `m-${Date.now()}`, emoji: d.emoji || "🛒", name: d.name, cost: 0,
       currentQty: 0, recQty: d.recQty, unit: d.unit, daysCover: 0,
       reason: "", done: false, source: "manual", note: d.note,
-    }]);
+    };
+    saveBuyItem(newItem);
   };
 
   const handleEditBuy = (id: string, d: { emoji: string; name: string; recQty: number; unit: Unit; note?: string }) => {
-    setBuy((prev) => prev.map((b) =>
-      b.id === id ? { ...b, emoji: d.emoji, name: d.name, recQty: d.recQty, unit: d.unit, note: d.note } : b,
-    ));
+    updateBuyItem(id, { emoji: d.emoji, name: d.name, recQty: d.recQty, unit: d.unit, note: d.note });
   };
 
   const handleDeleteBuy = (id: string) => {
-    setBuy((prev) => prev.filter((b) => b.id !== id));
+    deleteBuyItem(id);
     if (id.startsWith("auto-")) setDismissedAuto((prev) => new Set(prev).add(id));
   };
 
   const handleBulkDone = (ids: string[]) => {
-    const set = new Set(ids);
-    setBuy((prev) => prev.map((b) => (set.has(b.id) ? { ...b, done: true } : b)));
+    ids.forEach((id) => updateBuyItem(id, { done: true }));
   };
 
   const handleBulkDelete = (ids: string[]) => {
-    const set = new Set(ids);
-    setBuy((prev) => prev.filter((b) => !set.has(b.id)));
+    ids.forEach((id) => deleteBuyItem(id));
     setDismissedAuto((prev) => {
       const next = new Set(prev);
       ids.filter((id) => id.startsWith("auto-")).forEach((id) => next.add(id));
@@ -189,25 +189,17 @@ const Index = () => {
   };
 
   const handleClearCompleted = () => {
-    setBuy((prev) => {
-      const removed = prev.filter((b) => b.done && b.id.startsWith("auto-")).map((b) => b.id);
-      if (removed.length) {
-        setDismissedAuto((d) => {
-          const next = new Set(d);
-          removed.forEach((id) => next.add(id));
-          return next;
-        });
-      }
-      return prev.filter((b) => !b.done);
+    const toRemove = buy.filter((b) => b.done);
+    toRemove.forEach((b) => {
+      deleteBuyItem(b.id);
+      if (b.id.startsWith("auto-")) setDismissedAuto((d) => new Set(d).add(b.id));
     });
   };
 
   const handleAddPetty = (type: "in" | "out", amount: number, desc: string, emoji: string) => {
-    setPetty((prev) => {
-      const last = prev[prev.length - 1]?.balance ?? 0;
-      const balance = +(type === "in" ? last + amount : last - amount).toFixed(2);
-      return [...prev, { id: Date.now(), type, desc, emoji, amount, time: nowTime(), balance }];
-    });
+    const last = petty[petty.length - 1]?.balance ?? 0;
+    const balance = +(type === "in" ? last + amount : last - amount).toFixed(2);
+    addPetty({ id: Date.now(), type, desc, emoji, amount, time: nowTime(), balance });
   };
 
   const handleSendChat = (text: string) => {
