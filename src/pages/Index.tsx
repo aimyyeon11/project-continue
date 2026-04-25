@@ -14,30 +14,10 @@ import { ExportSheet } from "@/features/money/ExportSheet";
 import { ChatView } from "@/features/ai/ChatView";
 import { mockBotReply } from "@/features/ai/mockBotReply";
 import { fmt } from "@/lib/format";
+import { useTxns, useStock, useBuyList, usePetty } from "@/hooks/useFirestore";
 import type {
   Tab, Txn, BuyItem, StockItem, ChatMsg, PettyEntry, ReceiptItem, Unit,
 } from "@/types";
-
-const initialTxns: Txn[] = [
-  { id: 1, type: "in", emoji: "💰", label: "Jualan Petang", amount: 420, time: "3:45pm", ts: 5 },
-  { id: 2, type: "in", emoji: "💰", label: "Jualan Pagi", amount: 380, time: "12:10pm", ts: 4 },
-  { id: 3, type: "in", emoji: "💰", label: "Penghantaran", amount: 440, time: "11:00am", ts: 3 },
-  { id: 4, type: "out", emoji: "🍗", label: "Beli Ayam", amount: 32, time: "9:20am", ts: 2 },
-  { id: 5, type: "out", emoji: "🛢️", label: "Minyak Masak", amount: 18, time: "8:05am", ts: 1 },
-];
-
-const initialStock: StockItem[] = [
-  { id: "1", emoji: "🍗", name: "Ayam", qty: 0.5, unit: "kg", minQty: 1, restockQty: 3, maxQty: 8, category: "Bahan Mentah" },
-  { id: "2", emoji: "🛢️", name: "Minyak Masak", qty: 0.3, unit: "liter", minQty: 0.5, restockQty: 2, maxQty: 5, category: "Bahan Mentah" },
-  { id: "3", emoji: "🌾", name: "Tepung", qty: 1.5, unit: "kg", minQty: 1, restockQty: 2, maxQty: 6, category: "Bahan Mentah" },
-  { id: "4", emoji: "📦", name: "Plastik Beg", qty: 20, unit: "pek", minQty: 10, restockQty: 30, maxQty: 80, category: "Pembungkusan" },
-  { id: "5", emoji: "🍚", name: "Beras", qty: 5, unit: "kg", minQty: 2, restockQty: 4, maxQty: 15, category: "Bahan Mentah" },
-  { id: "6", emoji: "🥚", name: "Telur", qty: 30, unit: "biji", minQty: 12, restockQty: 24, maxQty: 60, category: "Bahan Mentah" },
-  { id: "7", emoji: "🥛", name: "Santan", qty: 2, unit: "liter", minQty: 0.5, restockQty: 1, maxQty: 5, category: "Minuman" },
-  { id: "8", emoji: "🍬", name: "Gula", qty: 3.5, unit: "kg", minQty: 1, restockQty: 2, maxQty: 8, category: "Bahan Mentah" },
-];
-
-const initialBuy: BuyItem[] = [];
 
 const greeting = () => {
   const h = new Date().getHours();
