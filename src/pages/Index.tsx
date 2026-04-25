@@ -14,7 +14,7 @@ import { ExportSheet } from "@/features/money/ExportSheet";
 import { ChatView } from "@/features/ai/ChatView";
 import { mockBotReply } from "@/features/ai/mockBotReply";
 import { fmt } from "@/lib/format";
-import { useTxns, useStock, useBuyList, usePetty } from "@/hooks/useFirestore";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type {
   Tab, Txn, BuyItem, StockItem, ChatMsg, PettyEntry, ReceiptItem, Unit,
 } from "@/types";
@@ -35,12 +35,15 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileName, setProfileName] = useState(() => localStorage.getItem("warkahbiz_profile_name") || "");
   const [businessName, setBusinessName] = useState(() => localStorage.getItem("warkahbiz_business_name") || "");
-  const { txns, addTxn } = useTxns();
-  const { stock, saveStock, deleteStock, adjustStock } = useStock();
-  const { buy, saveBuyItem, deleteBuyItem, updateBuyItem } = useBuyList();
+  const [txns, setTxns] = useLocalStorage<Txn[]>("warkahbiz_txns", []);
+  const [stock, setStock] = useLocalStorage<StockItem[]>("warkahbiz_stock", []);
+  const [buy, setBuy] = useLocalStorage<BuyItem[]>("warkahbiz_buy", []);
   const [dismissedAuto, setDismissedAuto] = useState<Set<string>>(new Set());
   const [chat, setChat] = useState<ChatMsg[]>([]);
-  const { petty, addPetty } = usePetty();
+  const [petty, setPetty] = useLocalStorage<PettyEntry[]>("warkahbiz_petty", [
+    { id: 1, type: "in", desc: "Top-up dari jualan", emoji: "💵", amount: 200, time: "Isnin 9:00am", balance: 200 },
+    { id: 2, type: "out", desc: "Beli plastik beg", emoji: "🛍️", amount: 15, time: "Isnin 11:30am", balance: 185 },
+  ]);
 
   useEffect(() => {
     setChat((prev) => {
@@ -81,76 +84,82 @@ const Index = () => {
       time: nowTime(),
       createdAt: new Date().toISOString(),
     };
-    addTxn(newTxn);
+    setTxns((prev) => [...prev, newTxn]);
   };
 
   const handleReceiptConfirm = (items: ReceiptItem[]) => {
     const time = nowTime();
-    items.forEach((r, i) => {
-      addTxn({
-        id: Date.now() + i,
-        ts: Date.now() + i,
-        time,
-        createdAt: new Date().toISOString(),
-        type: "out",
-        emoji: r.emoji,
-        label: `Beli ${r.name}`,
-        amount: r.price,
-      });
-    });
+    const newTxns: Txn[] = items.map((r, i) => ({
+      id: Date.now() + i,
+      ts: Date.now() + i,
+      time,
+      createdAt: new Date().toISOString(),
+      type: "out",
+      emoji: r.emoji,
+      label: `Beli ${r.name}`,
+      amount: r.price,
+    }));
+    setTxns((prev) => [...prev, ...newTxns]);
     toast.success(`${items.length} item berjaya disimpan! 🎉`);
   };
 
   const handleBought = (id: string) => {
-    const item = buy.find((b) => b.id === id);
-    if (item) updateBuyItem(id, { done: !item.done });
+    setBuy((prev) => prev.map((b) => b.id === id ? { ...b, done: !b.done } : b));
   };
 
   const handleAdjustStock = (id: string, delta: number) => {
-    const item = stock.find((s) => s.id === id);
-    if (!item) return;
-    const newQty = Math.max(0, +(item.qty + delta).toFixed(2));
-    adjustStock(id, newQty);
+    setStock((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      const newQty = Math.max(0, +(s.qty + delta).toFixed(2));
+      return { ...s, qty: newQty };
+    }));
   };
 
   const handleSaveStock = (item: StockItem) => {
-    saveStock(item);
+    setStock((prev) => {
+      const exists = prev.find((s) => s.id === item.id);
+      if (exists) return prev.map((s) => s.id === item.id ? item : s);
+      return [...prev, item];
+    });
     toast.success("Stok disimpan ✅");
   };
 
   const handleDeleteStock = (id: string) => {
-    deleteStock(id);
+    setStock((prev) => prev.filter((s) => s.id !== id));
     toast.success("Item dipadam");
   };
 
   // Auto-sync: low-stock items appear in Nak Beli unless dismissed
   useEffect(() => {
-    // Add new auto-restock items
-    stock.forEach((s) => {
-      if (s.qty > s.restockQty) return;
-      const autoId = `auto-${s.id}`;
-      if (dismissedAuto.has(autoId)) return;
-      if (buy.some((b) => b.id === autoId)) return;
-      if (buy.some((b) => b.name.toLowerCase() === s.name.toLowerCase() && b.source !== "auto")) return;
-      const need = Math.max(s.restockQty - s.qty, s.restockQty);
-      saveBuyItem({
-        id: autoId, emoji: s.emoji, name: s.name, cost: 0,
-        currentQty: s.qty, recQty: +need.toFixed(1), unit: s.unit, daysCover: 0,
-        reason: s.qty <= s.minQty ? "Habis!" : "Hampir habis",
-        done: false, source: "auto",
+    setBuy((prevBuy) => {
+      let nextBuy = [...prevBuy];
+      // Add new auto-restock items
+      stock.forEach((s) => {
+        if (s.qty > s.restockQty) return;
+        const autoId = `auto-${s.id}`;
+        if (dismissedAuto.has(autoId)) return;
+        if (nextBuy.some((b) => b.id === autoId)) return;
+        if (nextBuy.some((b) => b.name.toLowerCase() === s.name.toLowerCase() && b.source !== "auto")) return;
+        const need = Math.max(s.restockQty - s.qty, s.restockQty);
+        nextBuy.push({
+          id: autoId, emoji: s.emoji, name: s.name, cost: 0,
+          currentQty: s.qty, recQty: +need.toFixed(1), unit: s.unit, daysCover: 0,
+          reason: s.qty <= s.minQty ? "Habis!" : "Hampir habis",
+          done: false, source: "auto",
+        });
       });
+      // Remove stale auto items (stock now sufficient and not yet done)
+      nextBuy = nextBuy.filter((b) => {
+        if (b.source !== "auto") return true;
+        const sId = b.id.replace(/^auto-/, "");
+        const s = stock.find((x) => x.id === sId);
+        if (!s) return true;
+        if (s.qty > s.restockQty && !b.done) return false;
+        return true;
+      });
+      return nextBuy;
     });
-    // Remove stale auto items (stock now sufficient and not yet done)
-    buy.forEach((b) => {
-      if (b.source !== "auto") return;
-      const sId = b.id.replace(/^auto-/, "");
-      const s = stock.find((x) => x.id === sId);
-      if (!s) return;
-      if (s.qty > s.restockQty && !b.done) {
-        deleteBuyItem(b.id);
-      }
-    });
-  }, [stock, dismissedAuto, buy, saveBuyItem, deleteBuyItem]);
+  }, [stock, dismissedAuto]);
 
   const handleResync = () => {
     setDismissedAuto(new Set());
@@ -163,24 +172,24 @@ const Index = () => {
       currentQty: 0, recQty: d.recQty, unit: d.unit, daysCover: 0,
       reason: "", done: false, source: "manual", note: d.note,
     };
-    saveBuyItem(newItem);
+    setBuy((prev) => [...prev, newItem]);
   };
 
   const handleEditBuy = (id: string, d: { emoji: string; name: string; recQty: number; unit: Unit; note?: string }) => {
-    updateBuyItem(id, { emoji: d.emoji, name: d.name, recQty: d.recQty, unit: d.unit, note: d.note });
+    setBuy((prev) => prev.map((b) => b.id === id ? { ...b, emoji: d.emoji, name: d.name, recQty: d.recQty, unit: d.unit, note: d.note } : b));
   };
 
   const handleDeleteBuy = (id: string) => {
-    deleteBuyItem(id);
+    setBuy((prev) => prev.filter((b) => b.id !== id));
     if (id.startsWith("auto-")) setDismissedAuto((prev) => new Set(prev).add(id));
   };
 
   const handleBulkDone = (ids: string[]) => {
-    ids.forEach((id) => updateBuyItem(id, { done: true }));
+    setBuy((prev) => prev.map((b) => ids.includes(b.id) ? { ...b, done: true } : b));
   };
 
   const handleBulkDelete = (ids: string[]) => {
-    ids.forEach((id) => deleteBuyItem(id));
+    setBuy((prev) => prev.filter((b) => !ids.includes(b.id)));
     setDismissedAuto((prev) => {
       const next = new Set(prev);
       ids.filter((id) => id.startsWith("auto-")).forEach((id) => next.add(id));
@@ -189,17 +198,25 @@ const Index = () => {
   };
 
   const handleClearCompleted = () => {
-    const toRemove = buy.filter((b) => b.done);
-    toRemove.forEach((b) => {
-      deleteBuyItem(b.id);
-      if (b.id.startsWith("auto-")) setDismissedAuto((d) => new Set(d).add(b.id));
+    setBuy((prev) => {
+      const autoIds = prev.filter((b) => b.done && b.id.startsWith("auto-")).map((b) => b.id);
+      if (autoIds.length) {
+        setDismissedAuto((d) => {
+          const next = new Set(d);
+          autoIds.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+      return prev.filter((b) => !b.done);
     });
   };
 
   const handleAddPetty = (type: "in" | "out", amount: number, desc: string, emoji: string) => {
-    const last = petty[petty.length - 1]?.balance ?? 0;
-    const balance = +(type === "in" ? last + amount : last - amount).toFixed(2);
-    addPetty({ id: Date.now(), type, desc, emoji, amount, time: nowTime(), balance });
+    setPetty((prev) => {
+      const last = prev[prev.length - 1]?.balance ?? 0;
+      const balance = +(type === "in" ? last + amount : last - amount).toFixed(2);
+      return [...prev, { id: Date.now(), type, desc, emoji, amount, time: nowTime(), balance }];
+    });
   };
 
   const handleSendChat = (text: string) => {
