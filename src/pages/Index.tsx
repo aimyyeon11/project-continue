@@ -35,15 +35,12 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileName, setProfileName] = useState(() => localStorage.getItem("warkahbiz_profile_name") || "");
   const [businessName, setBusinessName] = useState(() => localStorage.getItem("warkahbiz_business_name") || "");
-  const [txns, setTxns] = useState<Txn[]>(initialTxns);
-  const [stock, setStock] = useState<StockItem[]>(initialStock);
-  const [buy, setBuy] = useState<BuyItem[]>(initialBuy);
+  const { txns, addTxn } = useTxns();
+  const { stock, saveStock, deleteStock, adjustStock } = useStock();
+  const { buy, saveBuyItem, deleteBuyItem, updateBuyItem } = useBuyList();
   const [dismissedAuto, setDismissedAuto] = useState<Set<string>>(new Set());
   const [chat, setChat] = useState<ChatMsg[]>([]);
-  const [petty, setPetty] = useState<PettyEntry[]>([
-    { id: 1, type: "in", desc: "Top-up dari jualan", emoji: "💵", amount: 200, time: "Isnin 9:00am", balance: 200 },
-    { id: 2, type: "out", desc: "Beli plastik beg", emoji: "🛍️", amount: 15, time: "Isnin 11:30am", balance: 185 },
-  ]);
+  const { petty, addPetty } = usePetty();
 
   useEffect(() => {
     setChat((prev) => {
@@ -58,45 +55,71 @@ const Index = () => {
     const outgoing = txns.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
     return { in: incoming, out: outgoing, profit: incoming - outgoing };
   }, [txns]);
-  const week = { in: today.in + 6600, out: today.out + 4610, profit: today.profit + 1990 };
-  const month = { in: today.in + 28400, out: today.out + 19800, profit: today.profit + 8600 };
+  const week = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recent = txns.filter((x) => x.ts >= cutoff);
+    const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
+    const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
+    return { in: i, out: o, profit: i - o };
+  }, [txns]);
+  const month = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const recent = txns.filter((x) => x.ts >= cutoff);
+    const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
+    const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
+    return { in: i, out: o, profit: i - o };
+  }, [txns]);
 
   const nowTime = () =>
     new Date().toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase().replace(" ", "");
 
   const handleSaveTxn = (t: Omit<Txn, "id" | "ts" | "time">) => {
-    setTxns((prev) => [{ ...t, id: Date.now(), ts: Date.now(), time: nowTime() }, ...prev]);
+    const newTxn: Txn = {
+      ...t,
+      id: Date.now(),
+      ts: Date.now(),
+      time: nowTime(),
+      createdAt: new Date().toISOString(),
+    };
+    addTxn(newTxn);
   };
 
   const handleReceiptConfirm = (items: ReceiptItem[]) => {
     const time = nowTime();
     items.forEach((r, i) => {
-      setTxns((prev) => [
-        { id: Date.now() + i, ts: Date.now() + i, time, type: "out", emoji: r.emoji, label: `Beli ${r.name}`, amount: r.price },
-        ...prev,
-      ]);
+      addTxn({
+        id: Date.now() + i,
+        ts: Date.now() + i,
+        time,
+        createdAt: new Date().toISOString(),
+        type: "out",
+        emoji: r.emoji,
+        label: `Beli ${r.name}`,
+        amount: r.price,
+      });
     });
     toast.success(`${items.length} item berjaya disimpan! 🎉`);
   };
 
   const handleBought = (id: string) => {
-    setBuy((prev) => prev.map((b) => (b.id === id ? { ...b, done: !b.done } : b)));
+    const item = buy.find((b) => b.id === id);
+    if (item) updateBuyItem(id, { done: !item.done });
   };
 
   const handleAdjustStock = (id: string, delta: number) => {
-    setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: Math.max(0, +(s.qty + delta).toFixed(2)) } : s)));
+    const item = stock.find((s) => s.id === id);
+    if (!item) return;
+    const newQty = Math.max(0, +(item.qty + delta).toFixed(2));
+    adjustStock(id, newQty);
   };
 
   const handleSaveStock = (item: StockItem) => {
-    setStock((prev) => {
-      const exists = prev.some((s) => s.id === item.id);
-      return exists ? prev.map((s) => (s.id === item.id ? item : s)) : [...prev, item];
-    });
+    saveStock(item);
     toast.success("Stok disimpan ✅");
   };
 
   const handleDeleteStock = (id: string) => {
-    setStock((prev) => prev.filter((s) => s.id !== id));
+    deleteStock(id);
     toast.success("Item dipadam");
   };
 
