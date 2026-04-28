@@ -98,10 +98,14 @@ export const OpExInputSheet = ({
 
         <button
           disabled={!canSave}
-          onClick={() => { if (canSave) onSave(category, parseFloat(amount), desc, paidFromPetty); }}
+          onClick={() => {
+            if (!canSave) return;
+            onSave(category, parseFloat(amount), desc.trim(), paidFromPetty);
+            onClose();
+          }}
           className={`w-full py-3 rounded-2xl font-extrabold shadow-card bg-gradient-cost text-white tap ${!canSave ? "opacity-40" : ""}`}
         >
-          Simpan Kos 💾
+          {canSave ? "Simpan Kos 💾" : "Isi jumlah & keterangan dulu"}
         </button>
       </div>
     </div>

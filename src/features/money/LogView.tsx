@@ -50,7 +50,7 @@ export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAdd
   const netProfit = grossProfit - otherOpex;
 
   return (
-    <div className="px-5 pt-6 space-y-5">
+    <div className="px-5 pt-6 pb-28 space-y-5">
       <header className="flex items-start justify-between animate-fade-in">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Rekod Kewangan 📊</h1>
