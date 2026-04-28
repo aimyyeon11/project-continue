@@ -76,6 +76,33 @@ const Index = () => {
     return { in: i, out: o, profit: i - o };
   }, [txns]);
 
+  // COGS = "Beli X" txns + OpEx entries with category "Kos Bahan"
+  const todayCogs = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const cutoff = todayStart.getTime();
+    const fromTxns = txns
+      .filter((x) => x.type === "out" && x.label.startsWith("Beli ") && x.ts >= cutoff)
+      .reduce((s, x) => s + x.amount, 0);
+    const fromOpex = opex
+      .filter((e) => e.category === "Kos Bahan" && e.ts >= cutoff)
+      .reduce((s, e) => s + e.amount, 0);
+    return fromTxns + fromOpex;
+  }, [txns, opex]);
+
+  const todayOtherOpex = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const cutoff = todayStart.getTime();
+    return opex
+      .filter((e) => e.category !== "Kos Bahan" && e.ts >= cutoff)
+      .reduce((s, e) => s + e.amount, 0);
+  }, [opex]);
+
+  const todayNetProfit = useMemo(() => {
+    return today.in - todayCogs - todayOtherOpex;
+  }, [today.in, todayCogs, todayOtherOpex]);
+
   const nowTime = () =>
     new Date().toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase().replace(" ", "");
 
@@ -294,7 +321,17 @@ const Index = () => {
           showNotificationDot={urgentCount > 0}
         />
         <div className="flex-1 overflow-y-auto pb-32 pt-0">
-          {tab === "today" && <TodayView today={today} week={week} profileName={profileName} businessName={businessName} />}
+          {tab === "today" && (
+            <TodayView
+              today={today}
+              week={week}
+              profileName={profileName}
+              businessName={businessName}
+              todayCogs={todayCogs}
+              todayOtherOpex={todayOtherOpex}
+              todayNetProfit={todayNetProfit}
+            />
+          )}
           {tab === "buy" && (
             <BuyView
               buy={buy}
@@ -319,7 +356,22 @@ const Index = () => {
               onGoToBuy={() => setTab("buy")}
             />
           )}
-          {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} opex={opex} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} onAddOpEx={handleAddOpEx} />}
+          {tab === "log" && (
+            <LogView
+              txns={txns}
+              today={today}
+              week={week}
+              month={month}
+              petty={petty}
+              opex={opex}
+              todayCogs={todayCogs}
+              todayOtherOpex={todayOtherOpex}
+              todayNetProfit={todayNetProfit}
+              onExport={() => setExportOpen(true)}
+              onAddPetty={handleAddPetty}
+              onAddOpEx={handleAddOpEx}
+            />
+          )}
           {tab === "ai" && (
             <ChatView
               messages={chat}
@@ -385,11 +437,14 @@ const TabBtn = ({ icon, label, active, onClick, badge }: {
   </button>
 );
 
-const TodayView = ({ today, week, profileName, businessName }: {
+const TodayView = ({ today, week, profileName, businessName, todayCogs, todayOtherOpex, todayNetProfit }: {
   today: { in: number; out: number; profit: number };
   week: { in: number; out: number; profit: number };
   profileName: string;
   businessName: string;
+  todayCogs: number;
+  todayOtherOpex: number;
+  todayNetProfit: number;
 }) => {
   const [insight, setInsight] = useState<string | null>(null);
   return (
@@ -405,9 +460,23 @@ const TodayView = ({ today, week, profileName, businessName }: {
         <div className="relative">
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider opacity-90">
             <Sparkles className="w-4 h-4" />
-            Untung Hari Ini 💚
+            Untung Bersih Hari Ini 💚
           </div>
-          <div className="text-6xl font-extrabold mt-3 tracking-tight">{fmt(today.profit)}</div>
+          <div className="text-5xl font-extrabold mt-3 tracking-tight">{fmt(todayNetProfit)}</div>
+          <div className="mt-4 space-y-1 text-sm opacity-95">
+            <div className="flex items-center justify-between">
+              <span>Jualan Kasar</span>
+              <span className="font-bold">+{fmt(today.in)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Kos Bahan (COGS)</span>
+              <span className="font-bold">−{fmt(todayCogs)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Kos Operasi Lain</span>
+              <span className="font-bold">−{fmt(todayOtherOpex)}</span>
+            </div>
+          </div>
           <div className="mt-4 flex items-center gap-2 text-sm font-medium opacity-95">
             <TrendingUp className="w-4 h-4" />
             Minggu ini: <span className="font-bold">{fmt(week.profit)}</span>
