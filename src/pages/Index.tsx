@@ -12,7 +12,7 @@ import { LogView } from "@/features/money/LogView";
 import { QuickInputModal } from "@/features/money/QuickInputModal";
 import { ExportSheet } from "@/features/money/ExportSheet";
 import { ChatView } from "@/features/ai/ChatView";
-import { mockBotReply } from "@/features/ai/mockBotReply";
+import type { BusinessSnapshot } from "@/features/ai/buildSystemPrompt";
 import { fmt } from "@/lib/format";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type {
@@ -41,6 +41,7 @@ const Index = () => {
   const [buy, setBuy] = useLocalStorage<BuyItem[]>("warkahbiz_buy", []);
   const [dismissedAuto, setDismissedAuto] = useState<Set<string>>(new Set());
   const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
   const [petty, setPetty] = useLocalStorage<PettyEntry[]>("warkahbiz_petty", [
     { id: 1, type: "in", desc: "Top-up dari jualan", emoji: "💵", amount: 200, time: "Isnin 9:00am", balance: 200 },
     { id: 2, type: "out", desc: "Beli plastik beg", emoji: "🛍️", amount: 15, time: "Isnin 11:30am", balance: 185 },
@@ -258,12 +259,19 @@ const Index = () => {
     }
   };
 
-  const handleSendChat = (text: string) => {
-    setChat((prev) => [
-      ...prev,
-      { id: Date.now(), from: "user", text },
-      { id: Date.now() + 1, from: "bot", text: mockBotReply(text) },
-    ]);
+  const handleSendChat = async (text: string, snapshot: BusinessSnapshot) => {
+    const userMsg: ChatMsg = { id: Date.now(), from: "user", text };
+    setChat((prev) => [...prev, userMsg]);
+    setChatLoading(true);
+    try {
+      const { sendToClaudeAPI } = await import("@/features/ai/claudeChat");
+      const reply = await sendToClaudeAPI(text, [...chat, userMsg], snapshot);
+      setChat((prev) => [...prev, { id: Date.now(), from: "bot", text: reply }]);
+    } catch {
+      setChat((prev) => [...prev, { id: Date.now(), from: "bot", text: "Maaf Boss, ada masalah sambungan. Cuba lagi sebentar. 🙏" }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const saveProfile = (name: string, biz: string) => {
@@ -312,7 +320,18 @@ const Index = () => {
             />
           )}
           {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} opex={opex} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} onAddOpEx={handleAddOpEx} />}
-          {tab === "ai" && <ChatView messages={chat} onSend={handleSendChat} />}
+          {tab === "ai" && (
+            <ChatView
+              messages={chat}
+              onSend={handleSendChat}
+              isLoading={chatLoading}
+              txns={txns}
+              stock={stock}
+              opex={opex}
+              petty={petty}
+              businessName={businessName || profileName || "WarkahBiz"}
+            />
+          )}
         </div>
 
         <button onClick={() => setModalOpen(true)} className={`fixed left-1/2 -translate-x-1/2 bottom-24 z-30 w-16 h-16 rounded-full bg-gradient-profit text-profit-foreground grid place-items-center shadow-fab tap ${urgentCount > 0 ? "animate-pulse-ring" : ""}`}>
