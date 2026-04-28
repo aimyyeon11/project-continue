@@ -20,13 +20,16 @@ const MiniStat = ({ label, value, tone }: { label: string; value: number; tone: 
   );
 };
 
-export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAddPetty, onAddOpEx }: {
+export const LogView = ({ txns, today, week, month, petty, opex, todayCogs, todayOtherOpex, todayNetProfit, onExport, onAddPetty, onAddOpEx }: {
   txns: Txn[];
   today: { in: number; out: number; profit: number };
   week: { in: number; out: number; profit: number };
   month: { in: number; out: number; profit: number };
   petty: PettyEntry[];
   opex: OpExEntry[];
+  todayCogs: number;
+  todayOtherOpex: number;
+  todayNetProfit: number;
   onExport: () => void;
   onAddPetty: (type: "in" | "out", amount: number, desc: string, emoji: string) => void;
   onAddOpEx: (category: OpExCategory, amount: number, desc: string, paidFromPetty: boolean) => void;
@@ -44,10 +47,7 @@ export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAdd
     return acc;
   }, {} as Record<OpExCategory, number>);
   const opexTotal = opex.reduce((s, e) => s + e.amount, 0);
-  const cogsTotal = opexByCategory["Kos Bahan"];
-  const grossProfit = today.in - cogsTotal;
-  const otherOpex = opexTotal - cogsTotal;
-  const netProfit = grossProfit - otherOpex;
+  const grossProfit = today.in - todayCogs;
 
   return (
     <div className="px-5 pt-6 pb-28 space-y-5">
@@ -62,18 +62,31 @@ export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAdd
       </header>
 
       <div className="flex gap-2 -mx-5 px-5 overflow-x-auto no-scrollbar">
-        {([
-          { k: "all", label: "Semua" },
-          { k: "in", label: "Jualan" },
-          { k: "out", label: "Belanja" },
-          { k: "petty", label: "Petty Cash 🪙" },
-          { k: "opex", label: "Kos Operasi 💼" },
-        ] as const).map(f => (
-          <button key={f.k} onClick={() => setFilter(f.k)}
-            className={`shrink-0 h-10 px-4 rounded-full text-sm font-bold tap border ${filter === f.k ? "bg-primary text-primary-foreground border-primary" : "bg-surface border-border text-muted-foreground"}`}>
-            {f.label}
-          </button>
-        ))}
+        <div className="w-full space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { k: "all", label: "Semua" },
+              { k: "in", label: "💰 Jualan" },
+              { k: "out", label: "💸 Belanja" },
+            ] as const).map(f => (
+              <button key={f.k} onClick={() => setFilter(f.k)}
+                className={`h-10 rounded-2xl text-xs font-bold tap border ${filter === f.k ? "bg-primary text-primary-foreground border-primary" : "bg-surface border-border text-muted-foreground"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { k: "petty", label: "🪙 Petty Cash" },
+              { k: "opex", label: "💼 Kos Operasi" },
+            ] as const).map(f => (
+              <button key={f.k} onClick={() => setFilter(f.k)}
+                className={`h-10 rounded-2xl text-xs font-bold tap border ${filter === f.k ? "bg-primary text-primary-foreground border-primary" : "bg-surface border-border text-muted-foreground"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {filter !== "petty" && filter !== "opex" ? (
@@ -175,7 +188,10 @@ export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAdd
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Kos Bahan (COGS)</span>
-                <span className="font-bold text-cost">−RM {cogsTotal.toFixed(2)}</span>
+                <div className="text-right">
+                  <span className="font-bold text-cost">−RM {todayCogs.toFixed(2)}</span>
+                  <div className="text-[10px] text-muted-foreground">Termasuk: Beli X + OpEx Kos Bahan</div>
+                </div>
               </div>
               <div className="flex items-center justify-between text-sm border-t border-border pt-1.5">
                 <span className="font-semibold">Untung Kasar</span>
@@ -183,11 +199,11 @@ export const LogView = ({ txns, today, week, month, petty, opex, onExport, onAdd
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Kos Operasi Lain</span>
-                <span className="font-bold text-cost">−RM {otherOpex.toFixed(2)}</span>
+                <span className="font-bold text-cost">−RM {todayOtherOpex.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-base border-t border-border pt-2">
                 <span className="font-extrabold">Untung Bersih</span>
-                <span className={`font-extrabold ${netProfit >= 0 ? "text-profit" : "text-cost"}`}>RM {netProfit.toFixed(2)}</span>
+                <span className={`font-extrabold ${todayNetProfit >= 0 ? "text-profit" : "text-cost"}`}>RM {todayNetProfit.toFixed(2)}</span>
               </div>
             </div>
           </div>
