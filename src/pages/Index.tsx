@@ -16,8 +16,9 @@ import { mockBotReply } from "@/features/ai/mockBotReply";
 import { fmt } from "@/lib/format";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type {
-  Tab, Txn, BuyItem, StockItem, ChatMsg, PettyEntry, ReceiptItem, Unit,
+  Tab, Txn, BuyItem, StockItem, ChatMsg, PettyEntry, ReceiptItem, Unit, OpExEntry, OpExCategory,
 } from "@/types";
+import { OPEX_CATEGORIES, OPEX_EMOJI } from "@/types";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -44,6 +45,7 @@ const Index = () => {
     { id: 1, type: "in", desc: "Top-up dari jualan", emoji: "💵", amount: 200, time: "Isnin 9:00am", balance: 200 },
     { id: 2, type: "out", desc: "Beli plastik beg", emoji: "🛍️", amount: 15, time: "Isnin 11:30am", balance: 185 },
   ]);
+  const [opex, setOpex] = useLocalStorage<OpExEntry[]>("warkahbiz_opex", []);
 
   useEffect(() => {
     setChat((prev) => {
@@ -219,6 +221,43 @@ const Index = () => {
     });
   };
 
+  const handleAddOpEx = (
+    category: OpExCategory,
+    amount: number,
+    desc: string,
+    paidFromPetty: boolean
+  ) => {
+    const now = new Date();
+    const entry: OpExEntry = {
+      id: Date.now(),
+      category,
+      desc,
+      amount,
+      paidFromPetty,
+      ts: Date.now(),
+      createdAt: now.toISOString(),
+      time: now.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit", hour12: true })
+               .toLowerCase().replace(" ", ""),
+    };
+    setOpex((prev) => [...prev, entry]);
+
+    if (paidFromPetty) {
+      setPetty((prev) => {
+        const last = prev[prev.length - 1]?.balance ?? 0;
+        const balance = +(last - amount).toFixed(2);
+        return [...prev, {
+          id: Date.now() + 1,
+          type: "out" as const,
+          desc: `[OpEx] ${category}: ${desc}`,
+          emoji: "💸",
+          amount,
+          time: entry.time,
+          balance,
+        }];
+      });
+    }
+  };
+
   const handleSendChat = (text: string) => {
     setChat((prev) => [
       ...prev,
@@ -272,7 +311,7 @@ const Index = () => {
               onGoToBuy={() => setTab("buy")}
             />
           )}
-          {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} />}
+          {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} onAddOpEx={handleAddOpEx} />}
           {tab === "ai" && <ChatView messages={chat} onSend={handleSendChat} />}
         </div>
 

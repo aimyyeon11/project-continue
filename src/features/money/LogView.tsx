@@ -26,6 +26,7 @@ export const LogView = ({ txns, today, week, month, petty, onExport, onAddPetty 
   petty: PettyEntry[];
   onExport: () => void;
   onAddPetty: (type: "in" | "out", amount: number, desc: string, emoji: string) => void;
+  onAddOpEx?: (category: string, amount: number, desc: string, paidFromPetty: boolean) => void;
 }) => {
   const [range, setRange] = useState<"today" | "week" | "month">("today");
   const [filter, setFilter] = useState<"all" | "in" | "out" | "petty">("all");

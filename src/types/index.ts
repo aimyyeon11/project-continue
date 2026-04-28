@@ -82,3 +82,35 @@ export const UNIT_STEP: Record<Unit, number> = {
   kg: 0.5, g: 50, liter: 0.5, ml: 100,
   biji: 1, pek: 1, kotak: 1, batang: 1, helai: 1,
 };
+
+export type OpExCategory =
+  | "Kos Bahan"
+  | "Utiliti"
+  | "Pembungkusan"
+  | "Gaji"
+  | "Pengangkutan"
+  | "Lain-lain";
+
+export const OPEX_CATEGORIES: OpExCategory[] = [
+  "Kos Bahan", "Utiliti", "Pembungkusan", "Gaji", "Pengangkutan", "Lain-lain",
+];
+
+export const OPEX_EMOJI: Record<OpExCategory, string> = {
+  "Kos Bahan":    "🥩",
+  "Utiliti":      "💡",
+  "Pembungkusan": "📦",
+  "Gaji":         "👷",
+  "Pengangkutan": "🚚",
+  "Lain-lain":    "🏷️",
+};
+
+export interface OpExEntry {
+  id: number;
+  category: OpExCategory;
+  desc: string;
+  amount: number;
+  time: string;
+  ts: number;
+  createdAt: string;
+  paidFromPetty: boolean;
+}
