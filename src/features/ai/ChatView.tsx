@@ -1,19 +1,34 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Bot, Send } from "lucide-react";
-import type { ChatMsg } from "@/types";
+import type { ChatMsg, Txn, StockItem, PettyEntry, OpExEntry } from "@/types";
+import type { BusinessSnapshot } from "./buildSystemPrompt";
 
 const QUICK_CHIPS = [
-  "📊 Untung hari ini?",
-  "🛒 Apa nak beli?",
-  "💰 Macam mana nak jimat?",
-  "📈 Kenapa kos naik?",
+  "📊 Tunjuk P&L hari ini",
+  "⚖️ Berapa break-even saya?",
+  "🏷️ Margin produk saya?",
+  "⚠️ Ada warning cash flow?",
+  "🛒 Stok apa nak habis?",
 ];
 
-export const ChatView = ({ messages, onSend }: { messages: ChatMsg[]; onSend: (t: string) => void }) => {
+export const ChatView = ({
+  messages, onSend, isLoading, txns, stock, opex, petty, businessName,
+}: {
+  messages: ChatMsg[];
+  onSend: (t: string, snapshot: BusinessSnapshot) => void;
+  isLoading: boolean;
+  txns: Txn[];
+  stock: StockItem[];
+  opex: OpExEntry[];
+  petty: PettyEntry[];
+  businessName: string;
+}) => {
   const [input, setInput] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
   const submit = (text: string) => {
-    if (!text.trim()) return;
-    onSend(text);
+    if (!text.trim() || isLoading) return;
+    onSend(text, { txns, stock, opex, petty, businessName });
     setInput("");
   };
 
@@ -45,6 +60,18 @@ export const ChatView = ({ messages, onSend }: { messages: ChatMsg[]; onSend: (t
             </div>
           </div>
         ))}
+        {isLoading && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-md bg-surface-elevated border border-border">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
 
       <div className="px-3 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
@@ -63,7 +90,7 @@ export const ChatView = ({ messages, onSend }: { messages: ChatMsg[]; onSend: (t
           placeholder="Tulis soalan Boss..."
           className="flex-1 h-12 px-4 rounded-full bg-surface-elevated border border-border focus:outline-none focus:border-primary text-sm"
         />
-        <button onClick={() => submit(input)} className="w-12 h-12 rounded-full bg-gradient-profit text-profit-foreground grid place-items-center tap shadow-card">
+        <button disabled={isLoading} onClick={() => submit(input)} className="w-12 h-12 rounded-full bg-gradient-profit text-profit-foreground grid place-items-center tap shadow-card disabled:opacity-50">
           <Send className="w-5 h-5" strokeWidth={2.5} />
         </button>
       </div>
