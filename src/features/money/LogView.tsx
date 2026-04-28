@@ -188,7 +188,10 @@ export const LogView = ({ txns, today, week, month, petty, opex, todayCogs, toda
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Kos Bahan (COGS)</span>
-                <span className="font-bold text-cost">−RM {cogsTotal.toFixed(2)}</span>
+                <div className="text-right">
+                  <span className="font-bold text-cost">−RM {todayCogs.toFixed(2)}</span>
+                  <div className="text-[10px] text-muted-foreground">Termasuk: Beli X + OpEx Kos Bahan</div>
+                </div>
               </div>
               <div className="flex items-center justify-between text-sm border-t border-border pt-1.5">
                 <span className="font-semibold">Untung Kasar</span>
@@ -196,11 +199,11 @@ export const LogView = ({ txns, today, week, month, petty, opex, todayCogs, toda
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Kos Operasi Lain</span>
-                <span className="font-bold text-cost">−RM {otherOpex.toFixed(2)}</span>
+                <span className="font-bold text-cost">−RM {todayOtherOpex.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-base border-t border-border pt-2">
                 <span className="font-extrabold">Untung Bersih</span>
-                <span className={`font-extrabold ${netProfit >= 0 ? "text-profit" : "text-cost"}`}>RM {netProfit.toFixed(2)}</span>
+                <span className={`font-extrabold ${todayNetProfit >= 0 ? "text-profit" : "text-cost"}`}>RM {todayNetProfit.toFixed(2)}</span>
               </div>
             </div>
           </div>
