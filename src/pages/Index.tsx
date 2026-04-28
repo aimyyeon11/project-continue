@@ -311,7 +311,7 @@ const Index = () => {
               onGoToBuy={() => setTab("buy")}
             />
           )}
-          {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} onAddOpEx={handleAddOpEx} />}
+          {tab === "log" && <LogView txns={txns} today={today} week={week} month={month} petty={petty} opex={opex} onExport={() => setExportOpen(true)} onAddPetty={handleAddPetty} onAddOpEx={handleAddOpEx} />}
           {tab === "ai" && <ChatView messages={chat} onSend={handleSendChat} />}
         </div>
 
