@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
-  Home, ShoppingCart, Package, BarChart3, Plus, Sparkles, TrendingUp, MessageCircle,
+  Home, Package, BarChart3, Plus, Sparkles, TrendingUp, MessageCircle,
 } from "lucide-react";
 import AppHeader from "@/components/AppHeader.jsx";
 import SettingsPanel from "@/components/SettingsPanel.jsx";
@@ -64,6 +64,15 @@ const Index = () => {
   const week = useMemo(() => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recent = txns.filter((x) => x.ts >= cutoff);
+    const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
+    const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
+    return { in: i, out: o, profit: i - o };
+  }, [txns]);
+  const lastWeek = useMemo(() => {
+    const now = Date.now();
+    const start = now - 14 * 24 * 60 * 60 * 1000;
+    const end = now - 7 * 24 * 60 * 60 * 1000;
+    const recent = txns.filter((x) => x.ts >= start && x.ts < end);
     const i = recent.filter((x) => x.type === "in").reduce((s, x) => s + x.amount, 0);
     const o = recent.filter((x) => x.type === "out").reduce((s, x) => s + x.amount, 0);
     return { in: i, out: o, profit: i - o };
@@ -301,6 +310,24 @@ const Index = () => {
     }
   };
 
+  const handleBoughtItems = (items: Array<{ name: string; qty: number; unit: string }>) => {
+    items.forEach(item => {
+      setStock(prev => {
+        const idx = prev.findIndex(s => s.name.toLowerCase() === item.name.toLowerCase());
+        if (idx === -1) return prev;
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], qty: +(updated[idx].qty + item.qty).toFixed(2) };
+        return updated;
+      });
+      setBuy(prev => prev.map(b =>
+        b.name.toLowerCase() === item.name.toLowerCase() && !b.done
+          ? { ...b, done: true }
+          : b
+      ));
+    });
+    toast.success("Stok dikemaskini ✅");
+  };
+
   const saveProfile = (name: string, biz: string) => {
     setProfileName(name);
     setBusinessName(biz);
@@ -325,6 +352,7 @@ const Index = () => {
             <TodayView
               today={today}
               week={week}
+              lastWeek={lastWeek}
               profileName={profileName}
               businessName={businessName}
               todayCogs={todayCogs}
@@ -332,29 +360,38 @@ const Index = () => {
               todayNetProfit={todayNetProfit}
             />
           )}
-          {tab === "buy" && (
-            <BuyView
-              buy={buy}
-              stock={stock}
-              onToggleDone={handleBought}
-              onResync={handleResync}
-              onAdd={handleAddBuy}
-              onEdit={handleEditBuy}
-              onDelete={handleDeleteBuy}
-              onBulkDone={handleBulkDone}
-              onBulkDelete={handleBulkDelete}
-              onClearCompleted={handleClearCompleted}
-              onGoToStock={() => setTab("stock")}
-            />
-          )}
-          {tab === "stock" && (
-            <StockView
-              stock={stock}
-              onAdjust={handleAdjustStock}
-              onSave={handleSaveStock}
-              onDelete={handleDeleteStock}
-              onGoToBuy={() => setTab("buy")}
-            />
+          {tab === "bekalan" && (
+            <div className="pb-32">
+              <div className="px-5 pt-6 pb-2">
+                <h2 className="text-xl font-extrabold tracking-tight">Nak Beli 🛒</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">AI cadangkan stok rendah secara automatik</p>
+              </div>
+              <BuyView
+                buy={buy}
+                stock={stock}
+                onToggleDone={handleBought}
+                onResync={handleResync}
+                onAdd={handleAddBuy}
+                onEdit={handleEditBuy}
+                onDelete={handleDeleteBuy}
+                onBulkDone={handleBulkDone}
+                onBulkDelete={handleBulkDelete}
+                onClearCompleted={handleClearCompleted}
+                onGoToStock={() => {}}
+              />
+              <div className="mx-5 my-4 border-t border-border" />
+              <div className="px-5 pb-2">
+                <h2 className="text-xl font-extrabold tracking-tight">Stok 📦</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Dikemaskini automatik bila dah belanja</p>
+              </div>
+              <StockView
+                stock={stock}
+                onAdjust={handleAdjustStock}
+                onSave={handleSaveStock}
+                onDelete={handleDeleteStock}
+                onGoToBuy={() => {}}
+              />
+            </div>
           )}
           {tab === "log" && (
             <LogView
@@ -391,10 +428,9 @@ const Index = () => {
         </button>
 
         <nav className="fixed left-1/2 -translate-x-1/2 bottom-0 w-full max-w-[440px] z-20 bg-surface/90 backdrop-blur-xl border-t border-border">
-          <div className="grid grid-cols-5 pt-2 pb-6 px-1">
+          <div className="grid grid-cols-4 pt-2 pb-6 px-1">
             <TabBtn icon={<Home />} label="Hari Ini" active={tab === "today"} onClick={() => setTab("today")} />
-            <TabBtn icon={<ShoppingCart />} label="Nak Beli" active={tab === "buy"} onClick={() => setTab("buy")} badge={urgentCount || undefined} />
-            <TabBtn icon={<Package />} label="Stok" active={tab === "stock"} onClick={() => setTab("stock")} />
+            <TabBtn icon={<Package />} label="Bekalan" active={tab === "bekalan"} onClick={() => setTab("bekalan")} badge={urgentCount || undefined} />
             <TabBtn icon={<BarChart3 />} label="Rekod" active={tab === "log"} onClick={() => setTab("log")} />
             <TabBtn icon={<MessageCircle />} label="Tanya AI" active={tab === "ai"} onClick={() => setTab("ai")} />
           </div>
@@ -405,6 +441,7 @@ const Index = () => {
             onClose={() => setModalOpen(false)}
             onSave={(t) => { handleSaveTxn(t); setModalOpen(false); }}
             onReceiptConfirm={(items) => { handleReceiptConfirm(items); setModalOpen(false); }}
+            onBoughtItems={handleBoughtItems}
           />
         )}
         {exportOpen && <ExportSheet onClose={() => setExportOpen(false)} />}
@@ -437,9 +474,10 @@ const TabBtn = ({ icon, label, active, onClick, badge }: {
   </button>
 );
 
-const TodayView = ({ today, week, profileName, businessName, todayCogs, todayOtherOpex, todayNetProfit }: {
+const TodayView = ({ today, week, lastWeek, profileName, businessName, todayCogs, todayOtherOpex, todayNetProfit }: {
   today: { in: number; out: number; profit: number };
   week: { in: number; out: number; profit: number };
+  lastWeek: { profit: number };
   profileName: string;
   businessName: string;
   todayCogs: number;
@@ -477,10 +515,30 @@ const TodayView = ({ today, week, profileName, businessName, todayCogs, todayOth
               <span className="font-bold">−{fmt(todayOtherOpex)}</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium opacity-95">
-            <TrendingUp className="w-4 h-4" />
-            Minggu ini: <span className="font-bold">{fmt(week.profit)}</span>
-          </div>
+          {(() => {
+            const diff = week.profit - lastWeek.profit;
+            const pct = lastWeek.profit !== 0 ? Math.round((diff / Math.abs(lastWeek.profit)) * 100) : null;
+            const isUp = diff >= 0;
+            return (
+              <div className="mt-4 space-y-1">
+                <div className="flex items-center gap-2 text-sm font-semibold opacity-90">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Minggu Ini: <span className="font-bold">{fmt(week.profit)}</span></span>
+                  {pct !== null && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-extrabold bg-white/20 text-white">
+                      {isUp ? "↑" : "↓"} {Math.abs(pct)}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs opacity-75">
+                  vs Minggu Lepas: <span className="font-semibold">{fmt(lastWeek.profit)}</span>
+                  <span className="ml-1 font-bold">
+                    {isUp ? `(+${fmt(diff)})` : `(${fmt(diff)})`}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

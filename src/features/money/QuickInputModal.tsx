@@ -12,10 +12,11 @@ const expenseCats = [
 
 const incomeSuggestions = ["Jualan Pagi", "Jualan Petang", "Penghantaran"];
 
-export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm }: {
+export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtItems }: {
   onClose: () => void;
   onSave: (t: Omit<Txn, "id" | "ts" | "time">) => void;
   onReceiptConfirm: (items: ReceiptItem[]) => void;
+  onBoughtItems?: (items: Array<{ name: string; qty: number; unit: string }>) => void;
 }) => {
   const [mode, setMode] = useState<TxnType>("in");
   const [amount, setAmount] = useState("0");
@@ -23,6 +24,7 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm }: {
   const [cat, setCat] = useState<{ emoji: string; name: string } | null>(null);
   const [success, setSuccess] = useState(false);
   const [scanner, setScanner] = useState(false);
+  const [stockInput, setStockInput] = useState("");
 
   const press = (k: string) => {
     setAmount(prev => {
@@ -44,6 +46,16 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm }: {
         onSave({ type: "in", emoji: "💰", label: note || "Jualan", amount: value });
       } else if (cat) {
         onSave({ type: "out", emoji: cat.emoji, label: `Beli ${cat.name}`, amount: value });
+        if (stockInput.trim() && onBoughtItems) {
+          const parsed = stockInput.split(/[,]+/).map(s => s.trim()).filter(Boolean).map(line => {
+            const qtyMatch = line.match(/(\d+\.?\d*)\s*(kg|g|liter|ml|biji|pek|kotak|batang|helai)?/i);
+            const qty = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
+            const unit = qtyMatch?.[2]?.toLowerCase() ?? "biji";
+            const name = line.replace(/\d+\.?\d*\s*(kg|g|liter|ml|biji|pek|kotak|batang|helai)?/i, "").replace(/rm[\d.]+/i, "").trim();
+            return { name, qty, unit };
+          }).filter(i => i.name.length > 0);
+          onBoughtItems(parsed);
+        }
       }
       onClose();
     }, 900);
@@ -134,6 +146,16 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm }: {
                     <span className="text-[10px] font-semibold">{c.name}</span>
                   </button>
                 ))}
+              </div>
+              <div className="space-y-1.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Kemaskini Stok (pilihan)</div>
+                <input
+                  value={stockInput}
+                  onChange={(e) => setStockInput(e.target.value)}
+                  placeholder="cth: telur 2 biji, minyak 1 liter"
+                  className="w-full h-12 px-4 rounded-2xl bg-surface-elevated border border-border text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary text-sm"
+                />
+                <div className="text-[11px] text-muted-foreground">Stok akan dikemaskini secara automatik</div>
               </div>
             </div>
           )}

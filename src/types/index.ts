@@ -1,4 +1,4 @@
-export type Tab = "today" | "buy" | "stock" | "log" | "ai";
+export type Tab = "today" | "bekalan" | "log" | "ai";
 export type StockLevel = "habis" | "sedikit" | "cukup" | "banyak";
 export type TxnType = "in" | "out";
 export type Unit = "kg" | "g" | "liter" | "ml" | "biji" | "pek" | "kotak" | "batang" | "helai";
