@@ -39,7 +39,7 @@ export const LogView = ({ txns, today, week, month, petty, opex, todayCogs, toda
   const [pettySheet, setPettySheet] = useState<null | "in" | "out">(null);
   const [opexSheet, setOpexSheet] = useState(false);
   const sum = range === "today" ? today : range === "week" ? week : month;
-  const filtered = filter === "all" ? txns : filter === "in" ? txns.filter(t => t.type === "in") : txns.filter(t => t.type === "out");
+  const filtered = (filter === "all" ? txns : filter === "in" ? txns.filter(t => t.type === "in") : txns.filter(t => t.type === "out")).slice().reverse();
   const balance = petty[petty.length - 1]?.balance ?? 0;
 
   const opexByCategory = OPEX_CATEGORIES.reduce((acc, cat) => {
