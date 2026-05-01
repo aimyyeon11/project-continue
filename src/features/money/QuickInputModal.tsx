@@ -16,7 +16,7 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
   onClose: () => void;
   onSave: (t: Omit<Txn, "id" | "ts" | "time">) => void;
   onReceiptConfirm: (items: ReceiptItem[]) => void;
-  onBoughtItems?: (items: Array<{ name: string; qty: number; unit: string }>) => void;
+  onBoughtItems?: (items: Array<{ name: string; qty: number; unit: string; isOpEx: boolean }>) => void;
 }) => {
   const [mode, setMode] = useState<TxnType>("in");
   const [amount, setAmount] = useState("0");
@@ -47,12 +47,14 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
       } else if (cat) {
         onSave({ type: "out", emoji: cat.emoji, label: `Beli ${cat.name}`, amount: value });
         if (stockInput.trim() && onBoughtItems) {
+          const opExWords = ["plastik","beg","straw","garpu","sudu","serbet","sabun","detergen","mop","penyapu","tuala","tisu"];
           const parsed = stockInput.split(/[,]+/).map(s => s.trim()).filter(Boolean).map(line => {
             const qtyMatch = line.match(/(\d+\.?\d*)\s*(kg|g|liter|ml|biji|pek|kotak|batang|helai)?/i);
             const qty = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
             const unit = qtyMatch?.[2]?.toLowerCase() ?? "biji";
             const name = line.replace(/\d+\.?\d*\s*(kg|g|liter|ml|biji|pek|kotak|batang|helai)?/i, "").replace(/rm[\d.]+/i, "").trim();
-            return { name, qty, unit };
+            const isOpEx = opExWords.some(w => name.toLowerCase().includes(w));
+            return { name, qty, unit, isOpEx };
           }).filter(i => i.name.length > 0);
           onBoughtItems(parsed);
         }
