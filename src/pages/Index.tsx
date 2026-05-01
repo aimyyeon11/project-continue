@@ -310,8 +310,9 @@ const Index = () => {
     }
   };
 
-  const handleBoughtItems = (items: Array<{ name: string; qty: number; unit: string }>) => {
-    items.forEach(item => {
+  const handleBoughtItems = (items: Array<{ name: string; qty: number; unit: string; isOpEx?: boolean }>) => {
+    const time = nowTime();
+    items.forEach((item, i) => {
       setStock(prev => {
         const idx = prev.findIndex(s => s.name.toLowerCase() === item.name.toLowerCase());
         if (idx === -1) return prev;
@@ -319,13 +320,33 @@ const Index = () => {
         updated[idx] = { ...updated[idx], qty: +(updated[idx].qty + item.qty).toFixed(2) };
         return updated;
       });
+
+      if (item.isOpEx) {
+        setPetty(prev => {
+          const last = prev[prev.length - 1]?.balance ?? 0;
+          return [...prev, {
+            id: Date.now() + i,
+            type: "out" as const,
+            desc: `Beli ${item.name}`,
+            emoji: "🧾",
+            amount: 0,
+            time,
+            balance: last,
+          }];
+        });
+      }
+
       setBuy(prev => prev.map(b =>
         b.name.toLowerCase() === item.name.toLowerCase() && !b.done
           ? { ...b, done: true }
           : b
       ));
     });
-    toast.success("Stok dikemaskini ✅");
+    toast.success("Stok & senarai dikemaskini ✅");
+  };
+
+  const handleSyncNotepad = (items: BuyItem[]) => {
+    setBuy(items);
   };
 
   const saveProfile = (name: string, biz: string) => {
@@ -371,12 +392,10 @@ const Index = () => {
                 stock={stock}
                 onToggleDone={handleBought}
                 onResync={handleResync}
-                onAdd={handleAddBuy}
-                onEdit={handleEditBuy}
-                onDelete={handleDeleteBuy}
                 onBulkDone={handleBulkDone}
                 onBulkDelete={handleBulkDelete}
                 onClearCompleted={handleClearCompleted}
+                onSyncNotepad={handleSyncNotepad}
                 onGoToStock={() => {}}
               />
               <div className="mx-5 my-4 border-t border-border" />
