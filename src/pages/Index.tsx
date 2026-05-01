@@ -37,7 +37,20 @@ const Index = () => {
   const [profileName, setProfileName] = useState(() => localStorage.getItem("warkahbiz_profile_name") || "");
   const [businessName, setBusinessName] = useState(() => localStorage.getItem("warkahbiz_business_name") || "");
   const [txns, setTxns] = useLocalStorage<Txn[]>("warkahbiz_txns", []);
-  const [stock, setStock] = useLocalStorage<StockItem[]>("warkahbiz_stock", []);
+  const [stock, setStock] = useLocalStorage<StockItem[]>("warkahbiz_stock", [
+    { id: "s-ayam", emoji: "🍗", name: "Ayam", qty: 0, unit: "kg", minQty: 1, restockQty: 3, maxQty: 10, category: "Bahan Mentah" },
+    { id: "s-telur", emoji: "🥚", name: "Telur", qty: 0, unit: "papan", minQty: 1, restockQty: 3, maxQty: 10, category: "Bahan Mentah" },
+    { id: "s-beras", emoji: "🍚", name: "Beras", qty: 0, unit: "kg", minQty: 5, restockQty: 10, maxQty: 25, category: "Bahan Mentah" },
+    { id: "s-minyak", emoji: "🛢️", name: "Minyak", qty: 0, unit: "liter", minQty: 1, restockQty: 3, maxQty: 10, category: "Bahan Mentah" },
+    { id: "s-tepung", emoji: "🌾", name: "Tepung", qty: 0, unit: "kg", minQty: 1, restockQty: 3, maxQty: 10, category: "Bahan Mentah" },
+    { id: "s-gula", emoji: "🥤", name: "Gula", qty: 0, unit: "kg", minQty: 1, restockQty: 3, maxQty: 10, category: "Bahan Mentah" },
+    { id: "s-garam", emoji: "🧂", name: "Garam", qty: 0, unit: "kg", minQty: 0.5, restockQty: 1, maxQty: 3, category: "Bahan Mentah" },
+    { id: "s-bawang", emoji: "🧅", name: "Bawang", qty: 0, unit: "kg", minQty: 0.5, restockQty: 2, maxQty: 5, category: "Bahan Mentah" },
+    { id: "s-cili", emoji: "🌶️", name: "Cili", qty: 0, unit: "kg", minQty: 0.5, restockQty: 1, maxQty: 3, category: "Bahan Mentah" },
+    { id: "s-santan", emoji: "🥛", name: "Santan", qty: 0, unit: "pek", minQty: 2, restockQty: 5, maxQty: 15, category: "Bahan Mentah" },
+    { id: "s-gas", emoji: "⛽", name: "Gas", qty: 0, unit: "tong", minQty: 0, restockQty: 1, maxQty: 2, category: "Lain-lain" },
+    { id: "s-bungkus", emoji: "📦", name: "Bungkus", qty: 0, unit: "pek", minQty: 2, restockQty: 5, maxQty: 20, category: "Pembungkusan" },
+  ]);
   const [buy, setBuy] = useLocalStorage<BuyItem[]>("warkahbiz_buy", []);
   const [dismissedAuto, setDismissedAuto] = useState<Set<string>>(new Set());
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -312,9 +325,14 @@ const Index = () => {
 
   const handleBoughtItems = (items: Array<{ name: string; qty: number; unit: string; isOpEx?: boolean }>) => {
     const time = nowTime();
+    const isMatch = (stockName: string, itemName: string) => {
+      const a = stockName.toLowerCase().trim();
+      const b = itemName.toLowerCase().trim();
+      return a === b || a.includes(b) || b.includes(a);
+    };
     items.forEach((item, i) => {
       setStock(prev => {
-        const idx = prev.findIndex(s => s.name.toLowerCase() === item.name.toLowerCase());
+        const idx = prev.findIndex(s => isMatch(s.name, item.name));
         if (idx === -1) return prev;
         const updated = [...prev];
         updated[idx] = { ...updated[idx], qty: +(updated[idx].qty + item.qty).toFixed(2) };
@@ -337,12 +355,12 @@ const Index = () => {
       }
 
       setBuy(prev => prev.map(b =>
-        b.name.toLowerCase() === item.name.toLowerCase() && !b.done
+        isMatch(b.name, item.name) && !b.done
           ? { ...b, done: true }
           : b
       ));
     });
-    toast.success("Stok & senarai dikemaskini ✅");
+    toast.success(`${items.length} item dikemaskini dalam Stok & Senarai ✅`);
   };
 
   const handleSyncNotepad = (items: BuyItem[]) => {
