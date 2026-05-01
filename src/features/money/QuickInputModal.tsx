@@ -26,6 +26,7 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
   const [scanner, setScanner] = useState(false);
   const [purchaseItems, setPurchaseItems] = useState<Array<{ emoji: string; name: string; qty: number; unit: string; isOpEx: boolean }>>([]);
   const [customItem, setCustomItem] = useState("");
+  const [lainNote, setLainNote] = useState("");
 
   const press = (k: string) => {
     setAmount(prev => {
@@ -49,10 +50,27 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
       setSuccess(true);
       setTimeout(() => {
         const value = parseFloat(amount) || 0;
-        onSave({ type: "out", emoji: cat.emoji, label: `Beli ${cat.name}`, amount: value });
-        if (purchaseItems.length > 0 && onBoughtItems) {
-          onBoughtItems(purchaseItems);
+        const itemLabel = cat.name === "Lain" && lainNote.trim()
+          ? `Beli ${lainNote.trim()}`
+          : `Beli ${cat.name}`;
+        onSave({ type: "out", emoji: cat.emoji, label: itemLabel, amount: value });
+        let finalItems = [...purchaseItems];
+        if (cat.name === "Lain" && lainNote.trim()) {
+          const alreadyInList = finalItems.some(p => p.name.toLowerCase() === lainNote.trim().toLowerCase());
+          if (!alreadyInList) {
+            finalItems = [...finalItems, {
+              emoji: "🏷️",
+              name: lainNote.trim(),
+              qty: 1,
+              unit: "biji",
+              isOpEx: false,
+            }];
+          }
         }
+        if (finalItems.length > 0 && onBoughtItems) {
+          onBoughtItems(finalItems);
+        }
+        setLainNote("");
         onClose();
       }, 900);
     }
@@ -111,7 +129,7 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
                   {expenseCats.map(c => (
                     <button
                       key={c.name}
-                      onClick={() => setCat(c)}
+                      onClick={() => { setCat(c); if (c.name !== "Lain") setLainNote(""); }}
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 tap border ${
                         cat?.name === c.name ? "bg-cost/20 border-cost" : "bg-surface-elevated border-border"
                       }`}
@@ -122,6 +140,24 @@ export const QuickInputModal = ({ onClose, onSave, onReceiptConfirm, onBoughtIte
                   ))}
                 </div>
               </div>
+
+              {cat?.name === "Lain" && (
+                <div className="space-y-1.5 animate-fade-in">
+                  <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Nama Item yang Dibeli
+                  </div>
+                  <input
+                    value={lainNote}
+                    onChange={(e) => setLainNote(e.target.value)}
+                    placeholder="cth: sayur bayam, sos tiram, kicap..."
+                    className="w-full h-12 px-4 rounded-2xl bg-surface-elevated border border-border text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary text-sm"
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    💡 Item ini akan direkodkan dan dikemaskini dalam stok secara automatik
+                  </p>
+                </div>
+              )}
 
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
